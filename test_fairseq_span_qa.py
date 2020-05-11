@@ -641,7 +641,7 @@ for fn in glob(test_files):
                                  max_query_length=max_query_length,
                                  doc_stride = doc_stride,
                                  unique_index=unique_index,
-                                 is_training=is_training
+                                 is_training=False
                                )
 
         for q, rs in zip(qas, rss):
