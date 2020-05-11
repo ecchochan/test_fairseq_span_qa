@@ -555,11 +555,13 @@ def handle_prediction_by_qid(self,
       output["start_log_prob"] = entry.start_log_prob
       output["end_log_prob"] = entry.end_log_prob
       nbest_json.append(output)
-    s = compute_f1(normalize_answer(q['answer_text']), normalize_answer(best_non_null_entry.text) if best_null_score < threshold else '')
-    all_predictions_output[qid] = [q['answer_text'], best_non_null_entry.text, best_null_score, s]
+
+    answer_text = q['answer_text'] if 'answer_text' in q else (q['answers']['text'] if q['answers'] else '')
+    s = compute_f1(normalize_answer(answer_text), normalize_answer(best_non_null_entry.text) if best_null_score < threshold else '')
+    all_predictions_output[qid] = [answer_text, best_non_null_entry.text, best_null_score, s]
     if debug:
       ans = normalize_answer(best_non_null_entry.text) if best_null_score < threshold else '*No answer*'
-      truth = normalize_answer(q['answer_text']) or '*No answer*'
+      truth = normalize_answer(answer_text) or '*No answer*'
       if (not wrong_only or ans != truth):
         print('Q:', q['question'])
         print('A:', ans, '(',best_null_score,')',  '[',best_score_no_ans,']', )
