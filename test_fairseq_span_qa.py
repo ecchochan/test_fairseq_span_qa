@@ -625,7 +625,7 @@ for fn in glob(test_files):
 
     orig_data = {} 
         
-    unique_inde = 0
+    unique_index = 0
     records = []
     all_rs = []
     ps = [p for e in j['data'] for p in e['paragraphs']]
