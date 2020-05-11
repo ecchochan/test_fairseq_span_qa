@@ -7,7 +7,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--test_files', metavar='DIR', default='')
-parser.add_argument('--tokenizer-dir', metavar='DIR', default='')
+parser.add_argument('--tokenizer_dir', metavar='DIR', default='')
 parser.add_argument('--max_seq_length', default=512, type=int)
 parser.add_argument('--max_query_length', default=368, type=int)
 parser.add_argument('--doc_stride', default=128, type=int)
@@ -20,7 +20,9 @@ max_seq_length = args.max_seq_length
 max_query_length = args.max_query_length
 doc_stride = args.doc_stride
 
-tk = FairSeqSPTokenizer(args)
+tk = FairSeqSPTokenizer(args.tokenizer_dir)
+
+
 
 
 
