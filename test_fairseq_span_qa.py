@@ -8,6 +8,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--test_files', metavar='DIR', default='')
 parser.add_argument('--tokenizer_dir', metavar='DIR', default='')
+parser.add_argument('--model_file', metavar='DIR', default='')
 parser.add_argument('--max_seq_length', default=512, type=int)
 parser.add_argument('--max_query_length', default=368, type=int)
 parser.add_argument('--doc_stride', default=128, type=int)
@@ -19,6 +20,7 @@ test_files = args.test_files
 max_seq_length = args.max_seq_length
 max_query_length = args.max_query_length
 doc_stride = args.doc_stride
+model_file = args.model_file
 
 tk = FairSeqSPTokenizer(args.tokenizer_dir)
 
@@ -545,8 +547,8 @@ from fairseq.models.roberta.model_span_qa import RobertaQAModel
 from time import time
 
 roberta_single = RobertaQAModel.from_pretrained(
-    roberta_directory, 
-    checkpoint_file=eval_model, 
+    tokenizer_dir, 
+    checkpoint_file=model_file, 
     strict=True).model
 
 
