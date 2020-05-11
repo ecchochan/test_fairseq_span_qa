@@ -597,7 +597,8 @@ if num_cores > 1:
 print("Using ", num_cores, "GPUs!")
             
             
-use_gpu = torch.cuda.is_available() if use_gpu is None else use_gpu
+use_gpu = torch.cuda.is_available()
+
 
 device = torch.device("cuda:0" if use_gpu else "cpu")
 
