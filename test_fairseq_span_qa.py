@@ -89,8 +89,14 @@ def chunks(l, n):
     
         for i in range(0, len(l), n):
             yield l[i:i + n]
-
-def from_records(records, max_seq_length):
+  
+def from_records(records, batch_size = 48, half=False, shuffle=True):
+    if half:
+      float = torch.HalfTensor
+    else:
+      float = torch.FloatTensor
+  
+  
     fn_style = isinstance(records,str)
     if fn_style:
       def from_file(fn):
@@ -103,19 +109,17 @@ def from_records(records, max_seq_length):
                     break
       records = from_file(records)
 
-    records = list(records)
-      
-    prepared_records = []
-    for record_samples in chunks(records,48):
+    if shuffle:
+      records = list(records)
+      random.shuffle(records)
+    for record_samples in chunks(records,batch_size):
         uid, inp, start, end, unanswerable = zip(*record_samples) if fn_style else zip(*(read(record) for record in record_samples))
-        start = start
-        end = end
-        unanswerable = unanswerable
-        inp = pad(inp, max_seq_length,dtype=np.long, torch_tensor=torch.LongTensor)
+        start = torch.LongTensor(start)
+        end = torch.LongTensor(end)
+        unanswerable = float(unanswerable)
+        inp = pad(inp,dtype=np.long, torch_tensor=torch.LongTensor)
 
-        for e in zip(inp, start, end, unanswerable):
-            yield e
-
+        yield inp, start, end, unanswerable
 
 
 
