@@ -117,7 +117,7 @@ def from_records(records, batch_size = 48, half=False, shuffle=True):
         start = torch.LongTensor(start)
         end = torch.LongTensor(end)
         unanswerable = float(unanswerable)
-        inp = pad(inp,dtype=np.long, torch_tensor=torch.LongTensor)
+        inp = pad(inp, max_seq_length,dtype=np.long, torch_tensor=torch.LongTensor)
 
         yield inp, start, end, unanswerable
 
