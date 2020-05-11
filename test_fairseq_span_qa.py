@@ -1,4 +1,4 @@
-from fstokenizers import FairSeqSPTokenizer, char_anchors_to_tok_pos
+
 from tqdm import tqdm
 import numpy as np
 import json
@@ -26,6 +26,8 @@ max_seq_length = args.max_seq_length
 max_query_length = args.max_query_length
 doc_stride = args.doc_stride
 model_file = args.model_file
+
+from fstokenizers import FairSeqSPTokenizer, char_anchors_to_tok_pos
 
 tokenizer = FairSeqSPTokenizer(args.tokenizer_dir)
 
@@ -563,7 +565,7 @@ def handle_prediction_by_qid(self,
         print('A:', ans, '(',best_null_score,')',  '[',best_score_no_ans,']', )
         print('Truth:', truth)
         print('')
-      score += s
+    score += s
     assert len(nbest_json) >= 1
     assert best_non_null_entry is not None
     all_predictions[qid] = best_non_null_entry.text
@@ -625,7 +627,7 @@ roberta.eval()
 for fn in glob(test_files):
     print(fn)
     with open(fn) as f:
-        j = json.load(f)
+        j = predict_data = json.load(f)
 
     orig_data = {} 
         
@@ -677,6 +679,7 @@ for fn in glob(test_files):
                 
                 
                 records.append(record)
+                all_rs.append(r)
 
 
     batches = list(zip(from_records(records,batch_size, half=fp16, shuffle=False), chunks(all_rs,batch_size)))
@@ -699,7 +702,15 @@ for fn in glob(test_files):
         handle_prediction_by_qid(
             roberta_single, 
             prediction_by_qid, 
-            qthreshold=-1, 
+            threshold=-1, 
             debug=False, 
             wrong_only=True)
   
+
+
+    result, exact_raw, f1_raw, wrongs = evaluate(predict_data["data"], 
+                                             all_predictions, 
+                                             na_probs=scores_diff_json, 
+                                             na_prob_thresh=0, 
+                                             out_file=None, 
+                                             out_image_dir=None)
