@@ -576,7 +576,7 @@ def handle_prediction_by_qid(self,
 from fairseq.models.roberta.model_span_qa import RobertaQAModel
 
 roberta_single = RobertaQAModel.from_pretrained(
-    tokenizer_dir, 
+    args.tokenizer_dir, 
     checkpoint_file=model_file, 
     strict=True).model
 
