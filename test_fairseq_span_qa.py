@@ -645,11 +645,6 @@ for fn in glob(test_files):
                                )
 
         for q, rs in zip(qas, rss):
-            ty = lang+'-'+q['type']
-            if ty not in bucket:
-                bucket[ty] = []
-            if ty+'-neg' not in bucket:
-                bucket[ty+'-neg'] = []
             for r in rs:
                 
                 inp = tokenizer.convert_tokens_to_ids(r.all_doc_tokens)
