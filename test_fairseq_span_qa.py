@@ -27,7 +27,7 @@ max_query_length = args.max_query_length
 doc_stride = args.doc_stride
 model_file = args.model_file
 
-tk = FairSeqSPTokenizer(args.tokenizer_dir)
+tokenizer = FairSeqSPTokenizer(args.tokenizer_dir)
 
 
 
@@ -652,7 +652,7 @@ for fn in glob(test_files):
                 bucket[ty+'-neg'] = []
             for r in rs:
                 
-                inp = tk.convert_tokens_to_ids(r.all_doc_tokens)
+                inp = tokenizer.convert_tokens_to_ids(r.all_doc_tokens)
                 start_position,end_position = char_anchors_to_tok_pos(r)
                 p_mask = r.p_mask
                 uid = r.unique_index[0]*1000 + r.unique_index[1]
