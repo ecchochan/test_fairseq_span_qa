@@ -1,7 +1,12 @@
 from fstokenizers import FairSeqSPTokenizer, char_anchors_to_tok_pos
 from tqdm import tqdm
-
-
+import numpy as np
+import json
+import torch
+from torch import nn
+from glob import glob
+import random
+import os
 
 import argparse
 
@@ -40,6 +45,7 @@ tk = FairSeqSPTokenizer(args.tokenizer_dir)
 
     
 import marshal
+
 def read(dat):
     uid, inp, start, end, unanswerable = marshal.loads(dat)
     inp = np.frombuffer(inp, dtype=np.uint32).astype(np.int32)
@@ -64,8 +70,6 @@ def pad(list_of_tokens,
         i += 1
     return k if torch_tensor is None else torch_tensor(k)
 
-from torch.utils.data.dataset import Dataset
-
 
 def chunks(l, n):
     if type(l) == type((e for e in range(1))):
@@ -85,6 +89,32 @@ def chunks(l, n):
     
         for i in range(0, len(l), n):
             yield l[i:i + n]
+
+def from_records(records, max_seq_length):
+    fn_style = isinstance(records,str)
+    if fn_style:
+      def from_file(fn):
+        with open(fn, 'rb') as f:
+            while True:
+                try:
+                    record = fread(f)
+                    yield record
+                except EOFError:
+                    break
+      records = from_file(records)
+
+    records = list(records)
+      
+    prepared_records = []
+    for record_samples in chunks(records,48):
+        uid, inp, start, end, unanswerable = zip(*record_samples) if fn_style else zip(*(read(record) for record in record_samples))
+        start = start
+        end = end
+        unanswerable = unanswerable
+        inp = pad(inp, max_seq_length,dtype=np.long, torch_tensor=torch.LongTensor)
+
+        for e in zip(inp, start, end, unanswerable):
+            yield e
 
 
 
@@ -544,7 +574,6 @@ def handle_prediction_by_qid(self,
             
 
 from fairseq.models.roberta.model_span_qa import RobertaQAModel
-from time import time
 
 roberta_single = RobertaQAModel.from_pretrained(
     tokenizer_dir, 
