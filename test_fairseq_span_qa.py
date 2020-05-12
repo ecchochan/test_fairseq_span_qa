@@ -595,10 +595,6 @@ batch_size = 128                      # 16 per device
 fp16 = True
 
             
-          
-if num_cores > 1:
-    roberta = nn.DataParallel(roberta_single)
-  
             
             
 print("Using ", num_cores, "GPUs!")
@@ -613,12 +609,18 @@ if not use_gpu:
   fp16 = False
 
             
-roberta.to(device)
+roberta_single.to(device)
             
 if fp16:
-  roberta.half()
+  roberta_single.half()
   
-roberta.eval()
+roberta_single.eval()
+          
+if num_cores > 1:
+    roberta = nn.DataParallel(roberta_single)
+  
+if use_gpu:
+  roberta.cuda()
   
 from collections import OrderedDict
   
@@ -631,7 +633,7 @@ for model_file in model_files:
 
   this_results = all_results[model_file] = OrderedDict()
 
-  
+
   for eval_fn in [fn for e in test_files for fn in glob(e)]:
       eval_fn_name = eval_fn.split('/')[-1]
       if eval_fn_name.endswith('.json'):
@@ -712,7 +714,7 @@ for model_file in model_files:
 
       nbest_json, all_predictions, scores_diff_json, all_predictions_output = \
           handle_prediction_by_qid(
-              roberta_single, 
+              roberta, 
               prediction_by_qid, 
               threshold=-1, 
               debug=False, 
