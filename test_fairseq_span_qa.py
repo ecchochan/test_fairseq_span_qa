@@ -351,6 +351,7 @@ def find_all_best_thresh(main_eval, preds, exact_raw, f1_raw, na_probs, qid_to_h
   main_eval['best_exact_thresh'] = exact_thresh
   main_eval['best_f1'] = best_f1
   main_eval['best_f1_thresh'] = f1_thresh
+  return f1_thresh
 
 def evaluate(dataset, preds, na_probs=None, na_prob_thresh=1.0, out_file=None, out_image_dir=None):
   if na_probs is None:
@@ -371,7 +372,11 @@ def evaluate(dataset, preds, na_probs=None, na_prob_thresh=1.0, out_file=None, o
     no_ans_eval = make_eval_dict(exact_thresh, f1_thresh, qid_list=no_ans_qids)
     merge_eval(out_eval, no_ans_eval, 'NoAns')
   if na_probs:
-    find_all_best_thresh(out_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans)
+    f1_thresh = find_all_best_thresh(out_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans)
+
+
+
+
   if na_probs and out_image_dir:
     run_precision_recall_analysis(out_eval, exact_raw, f1_raw, na_probs, 
                                   qid_to_has_ans, out_image_dir)
@@ -628,8 +633,10 @@ from collections import OrderedDict
   
 all_results = OrderedDict()
 
+cache = {}
 
 for model_file in model_files:
+  print('loading %s ...'%model_file)
   orig.model.load_pretrained(model_file)
 
   this_results = all_results[model_file] = OrderedDict()
@@ -641,60 +648,65 @@ for model_file in model_files:
         eval_fn_name = eval_fn_name[:-5]
 
       print(eval_fn)
-      with open(eval_fn) as f:
-          j = predict_data = json.load(f)
 
-      orig_data = {} 
-          
-      unique_index = 0
-      records = []
-      all_rs = []
-      ps = [p for e in j['data'] for p in e['paragraphs']]
-      for p in tqdm(ps):
-          for q in p['qas']:
-              orig_data[q['id']] = q
-          unique_index += 1
-          context = p['context']
-          qas = p['qas']
-          rss = tokenizer.merge_cq(context, 
-                                   qas,
-                                   max_seq_length = max_seq_length,
-                                   max_query_length=max_query_length,
-                                   doc_stride = doc_stride,
-                                   unique_index=unique_index,
-                                   is_training=False
-                                 )
+      if eval_fn in cache:
+          orig_data, records, all_rs = cache[eval_fn]
+      else:
+          with open(eval_fn) as f:
+              j = predict_data = json.load(f)
 
-          for q, rs in zip(qas, rss):
-              for r in rs:
-                  
-                  inp = tokenizer.convert_tokens_to_ids(r.all_doc_tokens)
-                  start_position,end_position = char_anchors_to_tok_pos(r)
-                  p_mask = r.p_mask
-                  uid = r.unique_index[0]*1000 + r.unique_index[1]
+          orig_data = {} 
+              
+          unique_index = 0
+          records = []
+          all_rs = []
+          ps = [p for e in j['data'] for p in e['paragraphs']]
+          for p in tqdm(ps):
+              for q in p['qas']:
+                  orig_data[q['id']] = q
+              unique_index += 1
+              context = p['context']
+              qas = p['qas']
+              rss = tokenizer.merge_cq(context, 
+                                       qas,
+                                       max_seq_length = max_seq_length,
+                                       max_query_length=max_query_length,
+                                       doc_stride = doc_stride,
+                                       unique_index=unique_index,
+                                       is_training=False
+                                     )
 
-                  no_ans = start_position == 0
-
-                  
+              for q, rs in zip(qas, rss):
+                  for r in rs:
                       
-                  assert start_position >= 0 and end_position >= 0 and start_position < len(inp) and end_position < len(inp)
-                  assert len(inp) <= max_seq_length
+                      inp = tokenizer.convert_tokens_to_ids(r.all_doc_tokens)
+                      start_position,end_position = char_anchors_to_tok_pos(r)
+                      p_mask = r.p_mask
+                      uid = r.unique_index[0]*1000 + r.unique_index[1]
 
-                  S, E = start_position, end_position
-                  
-                  record = marshal.dumps(
-                      (
-                      uid,
-                      np.array(inp,dtype=np.uint32).tobytes(),
-                      start_position,
-                      end_position,
-                      int(no_ans)
+                      no_ans = start_position == 0
+
+                      
+                          
+                      assert start_position >= 0 and end_position >= 0 and start_position < len(inp) and end_position < len(inp)
+                      assert len(inp) <= max_seq_length
+
+                      S, E = start_position, end_position
+                      
+                      record = marshal.dumps(
+                          (
+                          uid,
+                          np.array(inp,dtype=np.uint32).tobytes(),
+                          start_position,
+                          end_position,
+                          int(no_ans)
+                          )
                       )
-                  )
-                  
-                  
-                  records.append(record)
-                  all_rs.append(r)
+                      
+                      
+                      records.append(record)
+                      all_rs.append(r)
+          cache[eval_fn] = orig_data, records, all_rs
 
 
       batches = list(zip(from_records(records,batch_size, half=fp16, shuffle=False), chunks(all_rs,batch_size)))
@@ -729,6 +741,12 @@ for model_file in model_files:
                                                na_prob_thresh=0, 
                                                out_file=None, 
                                                out_image_dir=None)
+      result, exact_raw, f1_raw, wrongs = evaluate(predict_data["data"], 
+                                               all_predictions, 
+                                               na_probs=scores_diff_json, 
+                                               na_prob_thresh=result['best_f1_thresh'], 
+                                               out_file=None, 
+                                               out_image_dir=None)
 
       print(json.dumps(result, indent=2))
 
@@ -736,12 +754,12 @@ for model_file in model_files:
       this_results[eval_fn_name] = result
 
 max_length = max(len(e) for e in this_results) + 2
-temp = '  %-'+str(max_length)+'s: %.1f (%.1f) [%.1f,%.1f]'
+temp = '  %-'+str(max_length)+'s: %.1f/%.1f (%.1f/%.1f) [%.1f,%.1f]'
 
 for model_file, this_results in all_results.items():
   print('%s:'%model_file)
   for eval_fn_name, result in this_results.items():
-    print(temp%(eval_fn_name, result['best_f1'], result['best_exact'], result['best_f1_thresh'], result['best_exact_thresh']) )
-
+    print(temp%(eval_fn_name, result.get('HasAns_f1','N/A'), result.get('NoAns_f1','N/A'), result.get('HasAns_exact','N/A'), result.get('NoAns_exact','N/A'), result['best_f1_thresh'], result['best_exact_thresh']) )
+  print()
 with open('all_results.json', 'w') as f:
-  json.dump(all_results, indent=2)
+  json.dump(all_results, f, indent=2)
