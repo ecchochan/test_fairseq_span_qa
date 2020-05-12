@@ -446,10 +446,10 @@ def handle_prediction_by_qid(self,
                              n_best_size = 5,
                              threshold = -1.5,
                              max_answer_length = 48,
+                             use_ans_class = True,
                              debug = False,
                              wrong_only = False):
   global prelim_predictions
-  use_ans_class = True
   all_predictions = {}
   all_predictions_output = {}
   scores_diff_json = {}
@@ -476,6 +476,8 @@ def handle_prediction_by_qid(self,
         end_top_index = end_top_log_probs.argsort()[-end_n_top:][::-1].tolist()
         start_top_log_probs = start_top_log_probs.tolist()
         end_top_log_probs = end_top_log_probs.tolist()
+        if not use_ans_class:
+            cur_null_score = start_top_log_probs[0] + end_top_log_probs[0]
         for start_index in start_top_index:
             for end_index in end_top_index:
               if start_index == 0 or end_index == 0:
@@ -641,6 +643,8 @@ for model_file in model_files:
 
   this_results = all_results[model_file] = OrderedDict()
 
+  use_ans_class = True
+
 
   for eval_fn in [fn for e in test_files for fn in glob(e)]:
       eval_fn_name = eval_fn.split('/')[-1]
@@ -715,11 +719,19 @@ for model_file in model_files:
       with torch.no_grad():
           for e, rs in tqdm(batches):
               inp, start, end, _ = e
-              (start_logits, end_logits, cls_logits), _ = roberta(inp.to(device=device))
+              outputs, _ = roberta(inp.to(device=device))
+
+              if len(outputs) == 3:
+                  (start_logits, end_logits, cls_logits) = outputs
+                  use_ans_class = True
+              else
+                  (start_logits, end_logits) = outputs
+                  use_ans_class = False
+
               start_logits = start_logits.squeeze(-1)
               end_logits = end_logits.squeeze(-1)
 
-              for result, r in zip(zip(*(start_logits, end_logits, cls_logits)), rs):
+              for result, r in zip(zip(*outputs), rs):
                   qid = r.qid
                   if qid not in prediction_by_qid:
                       prediction_by_qid[qid] = []
@@ -729,6 +741,7 @@ for model_file in model_files:
           handle_prediction_by_qid(
               roberta, 
               prediction_by_qid, 
+              use_ans_class=use_ans_class,
               threshold=-1, 
               debug=False, 
               wrong_only=True)
