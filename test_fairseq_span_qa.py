@@ -630,7 +630,7 @@ all_results = OrderedDict()
 
 
 for model_file in model_files:
-  roberta.load_pretrained(model_file)
+  orig.model.load_pretrained(model_file)
 
   this_results = all_results[model_file] = OrderedDict()
 
