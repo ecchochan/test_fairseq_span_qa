@@ -775,7 +775,7 @@ temp = '  %-'+str(max_length)+'s: %.1f/%.1f (%.1f/%.1f) [%.1f,%.1f]'
 for model_file, this_results in all_results.items():
   print('%s:'%model_file)
   for eval_fn_name, result in this_results.items():
-    print(temp%(eval_fn_name, result.get('HasAns_f1','N/A'), result.get('NoAns_f1','N/A'), result.get('HasAns_exact','N/A'), result.get('NoAns_exact','N/A'), result['best_f1_thresh'], result['best_exact_thresh']) )
+    print(temp%(eval_fn_name, result.get('HasAns_f1',-1), result.get('NoAns_f1',-1), result.get('HasAns_exact',-1), result.get('NoAns_exact',-1), result['best_f1_thresh'], result['best_exact_thresh']) )
   print()
 with open('all_results.json', 'w') as f:
   json.dump(all_results, f, indent=2)
