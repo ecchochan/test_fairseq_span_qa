@@ -634,7 +634,7 @@ for model_file in model_files:
   this_results = all_results[model_file_name] = {}
 
   for eval_fn in [fn for e in test_files for fn in glob(e)]:
-      eval_fn_name = eval_fn_name.split('/')[-1]
+      eval_fn_name = eval_fn.split('/')[-1]
       if eval_fn_name.endswith('.json'):
         eval_fn_name = eval_fn_name[:-5]
 
