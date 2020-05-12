@@ -721,12 +721,12 @@ for model_file in model_files:
               inp, start, end, _ = e
               outputs, _ = roberta(inp.to(device=device))
 
-              if len(outputs) == 3:
+              use_ans_class = len(outputs) == 3
+
+              if use_ans_class:
                   (start_logits, end_logits, cls_logits) = outputs
-                  use_ans_class = True
-              else
+              else:
                   (start_logits, end_logits) = outputs
-                  use_ans_class = False
 
               start_logits = start_logits.squeeze(-1)
               end_logits = end_logits.squeeze(-1)
