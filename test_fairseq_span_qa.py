@@ -627,11 +627,7 @@ for model_file in model_files:
   if model_file != model_files[0]:
     roberta.load_state_dict(torch.load(model_file))
 
-  model_file_name = model_file.split('/')[-1]
-  if model_file_name.endswith('.pt'):
-    model_file_name = model_file_name[:-3]
-
-  this_results = all_results[model_file_name] = {}
+  this_results = all_results[model_file] = {}
 
   for eval_fn in [fn for e in test_files for fn in glob(e)]:
       eval_fn_name = eval_fn.split('/')[-1]
@@ -736,11 +732,10 @@ for model_file in model_files:
 max_length = max(len(e) for e in this_results) + 2
 temp = '  %-'+str(max_length)+'s: %.1f (%.1f) [%.1f,%.1f]'
 
-for model_file_name, this_results in all_results.items():
-  print('%s:'%model_file_name)
+for model_file, this_results in all_results.items():
+  print('%s:'%model_file)
   for eval_fn_name, result in this_results.items():
     print(temp%(eval_fn_name, result['best_f1'], result['best_exact'], result['best_f1_thresh'], result['best_exact_thresh']) )
 
-print(json.dumps(this_stats, indent=2))
 with open('all_results.json') as f:
   json.dump(all_results, indent=2)
