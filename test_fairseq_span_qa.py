@@ -742,5 +742,5 @@ for model_file, this_results in all_results.items():
   for eval_fn_name, result in this_results.items():
     print(temp%(eval_fn_name, result['best_f1'], result['best_exact'], result['best_f1_thresh'], result['best_exact_thresh']) )
 
-with open('all_results.json') as f:
+with open('all_results.json', 'w') as f:
   json.dump(all_results, indent=2)
