@@ -16,6 +16,7 @@ parser.add_argument('--tokenizer_dir', metavar='DIR', default='')
 parser.add_argument('--model_files', metavar='DIR', default='')
 parser.add_argument('--max_seq_length', default=512, type=int)
 parser.add_argument('--max_query_length', default=368, type=int)
+parser.add_argument('--merge_style', default=1, type=int)
 parser.add_argument('--doc_stride', default=128, type=int)
 
 
@@ -26,6 +27,7 @@ max_seq_length = args.max_seq_length
 max_query_length = args.max_query_length
 doc_stride = args.doc_stride
 model_files = args.model_files.split(',')
+merge_style = args.merge_style
 
 from fstokenizers import FairSeqSPTokenizer, char_anchors_to_tok_pos
 
@@ -677,6 +679,7 @@ for model_file in model_files:
                                        qas,
                                        max_seq_length = max_seq_length,
                                        max_query_length=max_query_length,
+                                       merge_style=merge_style,
                                        doc_stride = doc_stride,
                                        unique_index=unique_index,
                                        is_training=False
