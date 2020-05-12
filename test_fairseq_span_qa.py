@@ -582,10 +582,12 @@ def handle_prediction_by_qid(self,
 
 from fairseq.models.roberta.model_span_qa import RobertaQAModel
 
-roberta_single = RobertaQAModel.from_pretrained(
+orig = RobertaQAModel.from_pretrained(
     args.tokenizer_dir, 
     checkpoint_file=model_files[0], 
-    strict=True).model
+    strict=True)
+
+roberta = orig.model
 
 
 
@@ -609,15 +611,15 @@ if not use_gpu:
   fp16 = False
 
             
-roberta_single.to(device)
+roberta.to(device)
             
 if fp16:
-  roberta_single.half()
+  roberta.half()
   
-roberta_single.eval()
+roberta.eval()
           
 if num_cores > 1:
-    roberta = nn.DataParallel(roberta_single)
+    roberta = nn.DataParallel(roberta)
   
 if use_gpu:
   roberta.cuda()
@@ -628,8 +630,7 @@ all_results = OrderedDict()
 
 
 for model_file in model_files:
-  if model_file != model_files[0]:
-    roberta.load_state_dict(torch.load(model_file))
+  roberta.load_pretrained(model_file)
 
   this_results = all_results[model_file] = OrderedDict()
 
