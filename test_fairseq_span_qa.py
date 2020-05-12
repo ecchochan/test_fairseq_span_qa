@@ -466,9 +466,11 @@ def handle_prediction_by_qid(self,
       sub_prelim_predictions = []
       if use_ans_class:
         start_top_log_probs, end_top_log_probs, cls_logits = result
-        cur_null_score = cls_logits.tolist()
+        cur_null_score = cls_logits.squeeze().tolist()
       else:
         start_top_log_probs, end_top_log_probs = result
+      start_top_log_probs = start_top_log_probs.squeeze()
+      end_top_log_probs = end_top_log_probs.squeeze()
       if True:
         start_top_log_probs = start_top_log_probs.cpu().detach().numpy()
         end_top_log_probs = end_top_log_probs.cpu().detach().numpy()
@@ -725,6 +727,7 @@ for model_file in model_files:
 
               if use_ans_class:
                   (start_logits, end_logits, cls_logits) = outputs
+                  cls_logits = cls_logits.cpu().detach().numpy()
               else:
                   (start_logits, end_logits) = outputs
 
