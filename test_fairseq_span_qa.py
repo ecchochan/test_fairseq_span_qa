@@ -13,7 +13,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--test_files', metavar='DIR', default='')
 parser.add_argument('--tokenizer_dir', metavar='DIR', default='')
-parser.add_argument('--model_file', metavar='DIR', default='')
+parser.add_argument('--model_files', metavar='DIR', default='')
 parser.add_argument('--max_seq_length', default=512, type=int)
 parser.add_argument('--max_query_length', default=368, type=int)
 parser.add_argument('--doc_stride', default=128, type=int)
@@ -21,11 +21,11 @@ parser.add_argument('--doc_stride', default=128, type=int)
 
 
 args = parser.parse_args()
-test_files = args.test_files
+test_files = args.test_files.split(',')
 max_seq_length = args.max_seq_length
 max_query_length = args.max_query_length
 doc_stride = args.doc_stride
-model_file = args.model_file
+model_files = args.model_files.split(',')
 
 from fstokenizers import FairSeqSPTokenizer, char_anchors_to_tok_pos
 
@@ -381,8 +381,7 @@ def evaluate(dataset, preds, na_probs=None, na_prob_thresh=1.0, out_file=None, o
   if out_file:
     with open(out_file, 'w') as f:
       json.dump(out_eval, f)
-  else:
-    print(json.dumps(out_eval, indent=2))
+
   return out_eval, exact_raw, f1_raw, wrongs
 
             
@@ -585,7 +584,7 @@ from fairseq.models.roberta.model_span_qa import RobertaQAModel
 
 roberta_single = RobertaQAModel.from_pretrained(
     args.tokenizer_dir, 
-    checkpoint_file=model_file, 
+    checkpoint_file=model_files[0], 
     strict=True).model
 
 
@@ -622,97 +621,126 @@ if fp16:
 roberta.eval()
   
   
-            
-        
-  
+all_results = {}
 
-for fn in glob(test_files):
-    print(fn)
-    with open(fn) as f:
-        j = predict_data = json.load(f)
+for model_file in model_files:
+  if model_file != model_files[0]:
+    roberta.load_state_dict(torch.load(model_file))
 
-    orig_data = {} 
-        
-    unique_index = 0
-    records = []
-    all_rs = []
-    ps = [p for e in j['data'] for p in e['paragraphs']]
-    for p in tqdm(ps):
-        for q in p['qas']:
-            orig_data[q['id']] = q
-        unique_index += 1
-        context = p['context']
-        qas = p['qas']
-        rss = tokenizer.merge_cq(context, 
-                                 qas,
-                                 max_seq_length = max_seq_length,
-                                 max_query_length=max_query_length,
-                                 doc_stride = doc_stride,
-                                 unique_index=unique_index,
-                                 is_training=False
-                               )
+  model_file_name = model_file.split('/')[-1]
+  if model_file_name.endswith('.pt'):
+    model_file_name = model_file_name[:-3]
 
-        for q, rs in zip(qas, rss):
-            for r in rs:
-                
-                inp = tokenizer.convert_tokens_to_ids(r.all_doc_tokens)
-                start_position,end_position = char_anchors_to_tok_pos(r)
-                p_mask = r.p_mask
-                uid = r.unique_index[0]*1000 + r.unique_index[1]
+  this_results = all_results[model_file_name] = {}
 
-                no_ans = start_position == 0
+  for eval_fn in [fn for e in test_files for fn in glob(e)]:
+      eval_fn_name = eval_fn_name.split('/')[-1]
+      if eval_fn_name.endswith('.json'):
+        eval_fn_name = eval_fn_name[:-5]
 
-                
-                    
-                assert start_position >= 0 and end_position >= 0 and start_position < len(inp) and end_position < len(inp)
-                assert len(inp) <= max_seq_length
+      print(eval_fn)
+      with open(eval_fn) as f:
+          j = predict_data = json.load(f)
 
-                S, E = start_position, end_position
-                
-                record = marshal.dumps(
-                    (
-                    uid,
-                    np.array(inp,dtype=np.uint32).tobytes(),
-                    start_position,
-                    end_position,
-                    int(no_ans)
-                    )
-                )
-                
-                
-                records.append(record)
-                all_rs.append(r)
+      orig_data = {} 
+          
+      unique_index = 0
+      records = []
+      all_rs = []
+      ps = [p for e in j['data'] for p in e['paragraphs']]
+      for p in tqdm(ps):
+          for q in p['qas']:
+              orig_data[q['id']] = q
+          unique_index += 1
+          context = p['context']
+          qas = p['qas']
+          rss = tokenizer.merge_cq(context, 
+                                   qas,
+                                   max_seq_length = max_seq_length,
+                                   max_query_length=max_query_length,
+                                   doc_stride = doc_stride,
+                                   unique_index=unique_index,
+                                   is_training=False
+                                 )
 
+          for q, rs in zip(qas, rss):
+              for r in rs:
+                  
+                  inp = tokenizer.convert_tokens_to_ids(r.all_doc_tokens)
+                  start_position,end_position = char_anchors_to_tok_pos(r)
+                  p_mask = r.p_mask
+                  uid = r.unique_index[0]*1000 + r.unique_index[1]
 
-    batches = list(zip(from_records(records,batch_size, half=fp16, shuffle=False), chunks(all_rs,batch_size)))
-    prediction_by_qid = {}
+                  no_ans = start_position == 0
 
-    with torch.no_grad():
-        for e, rs in tqdm(batches):
-            inp, start, end, _ = e
-            (start_logits, end_logits, cls_logits), _ = roberta(inp.to(device=device))
-            start_logits = start_logits.squeeze(-1)
-            end_logits = end_logits.squeeze(-1)
+                  
+                      
+                  assert start_position >= 0 and end_position >= 0 and start_position < len(inp) and end_position < len(inp)
+                  assert len(inp) <= max_seq_length
 
-            for result, r in zip(zip(*(start_logits, end_logits, cls_logits)), rs):
-                qid = r.qid
-                if qid not in prediction_by_qid:
-                    prediction_by_qid[qid] = []
-                prediction_by_qid[qid].append((result, r))
-
-    nbest_json, all_predictions, scores_diff_json, all_predictions_output = \
-        handle_prediction_by_qid(
-            roberta_single, 
-            prediction_by_qid, 
-            threshold=-1, 
-            debug=False, 
-            wrong_only=True)
-  
+                  S, E = start_position, end_position
+                  
+                  record = marshal.dumps(
+                      (
+                      uid,
+                      np.array(inp,dtype=np.uint32).tobytes(),
+                      start_position,
+                      end_position,
+                      int(no_ans)
+                      )
+                  )
+                  
+                  
+                  records.append(record)
+                  all_rs.append(r)
 
 
-    result, exact_raw, f1_raw, wrongs = evaluate(predict_data["data"], 
-                                             all_predictions, 
-                                             na_probs=scores_diff_json, 
-                                             na_prob_thresh=0, 
-                                             out_file=None, 
-                                             out_image_dir=None)
+      batches = list(zip(from_records(records,batch_size, half=fp16, shuffle=False), chunks(all_rs,batch_size)))
+      prediction_by_qid = {}
+
+      with torch.no_grad():
+          for e, rs in tqdm(batches):
+              inp, start, end, _ = e
+              (start_logits, end_logits, cls_logits), _ = roberta(inp.to(device=device))
+              start_logits = start_logits.squeeze(-1)
+              end_logits = end_logits.squeeze(-1)
+
+              for result, r in zip(zip(*(start_logits, end_logits, cls_logits)), rs):
+                  qid = r.qid
+                  if qid not in prediction_by_qid:
+                      prediction_by_qid[qid] = []
+                  prediction_by_qid[qid].append((result, r))
+
+      nbest_json, all_predictions, scores_diff_json, all_predictions_output = \
+          handle_prediction_by_qid(
+              roberta_single, 
+              prediction_by_qid, 
+              threshold=-1, 
+              debug=False, 
+              wrong_only=True)
+    
+
+
+      result, exact_raw, f1_raw, wrongs = evaluate(predict_data["data"], 
+                                               all_predictions, 
+                                               na_probs=scores_diff_json, 
+                                               na_prob_thresh=0, 
+                                               out_file=None, 
+                                               out_image_dir=None)
+
+      print(json.dumps(result, indent=2))
+
+
+      this_results[eval_fn_name] = result
+
+max_length = max(len(e) for e in this_results) + 2
+temp = '  %-'+str(max_length)+'s: %.1f (%.1f) [%.1f,%.1f]'
+
+for model_file_name, this_results in all_results.items():
+  print('%s:'%model_file_name)
+  for eval_fn_name, result in this_results.items():
+    print(temp%(eval_fn_name, result['best_f1'], result['best_exact'], result['best_f1_thresh'], result['best_exact_thresh']) )
+
+print(json.dumps(this_stats, indent=2))
+with open('all_results.json') as f:
+  json.dump(all_results, indent=2)
