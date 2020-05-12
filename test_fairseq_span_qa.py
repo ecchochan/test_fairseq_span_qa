@@ -620,15 +620,18 @@ if fp16:
   
 roberta.eval()
   
+from collections import OrderedDict
   
-all_results = {}
+all_results = OrderedDict()
+
 
 for model_file in model_files:
   if model_file != model_files[0]:
     roberta.load_state_dict(torch.load(model_file))
 
-  this_results = all_results[model_file] = {}
+  this_results = all_results[model_file] = OrderedDict()
 
+  
   for eval_fn in [fn for e in test_files for fn in glob(e)]:
       eval_fn_name = eval_fn.split('/')[-1]
       if eval_fn_name.endswith('.json'):
